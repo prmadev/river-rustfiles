@@ -7,6 +7,7 @@ pub struct Config {
     pub password_manager: String,
     pub clipboard_manager: String,
     pub editor: String,
+    pub touch: String,
 }
 pub struct Places {}
 impl Places {
@@ -38,6 +39,7 @@ impl Config {
             editor: String::from("zoxofi"),
             clipboard_manager: String::from("clipman pick -t rofi"),
             password_manager: String::from("rofi-rbw"),
+            touch: String::from("2:14:ETPS/2_Elantech_Touchpad"),
         }
     }
 }
