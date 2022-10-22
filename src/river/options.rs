@@ -1,6 +1,6 @@
 use super::ctl;
 
-pub fn options() {
+pub async fn options() {
     const FLOAT_ADD: &str = "float-filter-add";
     const ID: &str = "app-id";
     const TITLE: &str = "title";
@@ -27,5 +27,11 @@ pub fn options() {
         vec!["default-layout", "rivertile"], // default layouting engine
     ];
 
-    que.iter().for_each(|x| ctl(x));
+    let mut handles = vec![];
+    for command in que.iter() {
+        handles.push(ctl(command.to_vec()));
+    }
+    for handle in handles {
+        handle.await;
+    }
 }

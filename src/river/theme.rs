@@ -4,7 +4,7 @@ use crate::rose::{ColorFormat, Colors};
 
 use super::ctl;
 
-pub fn theme(colors: &Rose) {
+pub async fn theme(colors: &Rose) {
     let colors = colors.to_owned();
     let base = &colors.get(Colors::Base, ColorFormat::UnixHex);
     let gold = &colors.get(Colors::Gold, ColorFormat::UnixHex);
@@ -18,5 +18,11 @@ pub fn theme(colors: &Rose) {
         vec!["border-width", "5"],
     ];
 
-    que.iter().for_each(|x| ctl(x));
+    let mut handles = vec![];
+    for command in que.iter() {
+        handles.push(ctl(command.to_vec()));
+    }
+    for handle in handles {
+        handle.await;
+    }
 }

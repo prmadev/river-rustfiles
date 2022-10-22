@@ -1,8 +1,12 @@
+use std::sync::Arc;
+
 use crate::config::{Config, Places};
 
 use super::ctl;
+use tokio::sync;
+use tokio::task;
 
-pub fn mouse() {
+pub async fn mouse() {
     let mut que: Vec<Vec<&str>> = vec![];
 
     que.push(vec![
@@ -21,10 +25,16 @@ pub fn mouse() {
         "resize-view",
     ]);
 
-    que.iter().for_each(|x| ctl(x));
+    let mut handles = vec![];
+    for command in que.iter() {
+        handles.push(ctl(command.to_vec()));
+    }
+    for handle in handles {
+        handle.await;
+    }
 }
 
-pub fn keyboard(conf: &Config) {
+pub async fn keyboard() {
     static MAP: &str = "map";
     static SPAWN: &str = "spawn";
     static NORMAL: &str = "normal";
@@ -35,17 +45,21 @@ pub fn keyboard(conf: &Config) {
     static RIVERTILE: &str = "rivertile";
     static NEXT: &str = "next";
     static PREV: &str = "previous";
-
-    let file: String = format!("{}/river/init", Places::config());
+    let file: &'static str = "home/a/river/init";
+    static TERM: &str = "kitty";
+    static LAUNCHER: &str = "rofi -show drun";
+    static PASSWORD_MANAGER: &str = "rofi-rbw";
+    static CLIPBOARD_MANAGER: &str = "clipman pick -t rofi";
+    static EDITOR: &str = "zoxofi";
 
     let que: Vec<Vec<&str>> = vec![
         vec![MAP, NORMAL, "Super", "R", SPAWN, &file],
-        vec![MAP, NORMAL, "Super", "Return", SPAWN, &conf.terminal],
-        vec![MAP, NORMAL, "Super", "D", SPAWN, &conf.launcher],
-        vec![MAP, NORMAL, "Super", "P", SPAWN, &conf.password_manager],
-        vec![MAP, NORMAL, "Super", "V", SPAWN, &conf.clipboard_manager],
-        vec![MAP, NORMAL, "Super+Shift", "Return", SPAWN, &conf.editor],
-        vec![MAP, NORMAL, "Super", "N", SPAWN, &conf.editor],
+        vec![MAP, NORMAL, "Super", "Return", SPAWN, TERM],
+        vec![MAP, NORMAL, "Super", "D", SPAWN, LAUNCHER],
+        vec![MAP, NORMAL, "Super", "P", SPAWN, PASSWORD_MANAGER],
+        vec![MAP, NORMAL, "Super", "V", SPAWN, CLIPBOARD_MANAGER],
+        vec![MAP, NORMAL, "Super+Shift", "Return", SPAWN, EDITOR],
+        vec![MAP, NORMAL, "Super", "N", SPAWN, EDITOR],
         vec![MAP, NORMAL, "Super", "J", FOCUS_VIEW, NEXT],
         vec![MAP, NORMAL, "Super", "K", FOCUS_VIEW, PREV],
         vec![MAP, NORMAL, "Super", "space", "zoom"],
@@ -216,5 +230,12 @@ pub fn keyboard(conf: &Config) {
         ],
     ];
 
-    que.iter().for_each(|x| ctl(x));
+    let mut handles = vec![];
+    for command in que {
+        handles.push(task::spawn(async move { ctl(command) }));
+    }
+
+    for handle in handles {
+        handle.await;
+    }
 }

@@ -4,86 +4,82 @@ use rustix::process;
 use std::{
     ffi::OsString,
     fs::{self, read_dir},
-    process::Command,
 };
 
 use crate::rose::{ColorFormat, Colors};
+use std::sync::Arc;
+use tokio::{process::Command, task};
+pub async fn run(colors: Arc<Rose>) {
+    let wall_path = format!("{}/{}", config_dir().unwrap().display(), "wallpaper");
 
-pub fn run(colors: &Rose) {
-    restart_proc("waybar", vec![]);
+    let handles = vec![
+        task::spawn(async move { restart_proc("waybar", vec![]).await }),
+        // Setting wallpaper (use 'ln -P' to an image here.)
+        task::spawn(
+            async move { restart_proc("swaybg", vec!["-m", "fill", "-i", &wall_path]).await },
+        ),
+        // something I saw others did. I don't know why.
+        task::spawn(async move {
+            restart_proc(
+                "mako",
+                vec![
+                    "--default-timeout",
+                    "5000",
+                    "--background-color",
+                    &colors.get(Colors::Surface, ColorFormat::RGBHex),
+                    "--border-color",
+                    &colors.get(Colors::Surface, ColorFormat::RGBHex),
+                    "--border-size",
+                    "0",
+                    "--font",
+                    "monospace",
+                    "--padding",
+                    "10",
+                    "--width",
+                    "350",
+                ],
+            )
+            .await
+        }),
+        task::spawn(async move {
+            restart_proc(
+                "rivertile",
+                vec!["-view-padding", "05", "-outer-padding", "05"],
+            )
+            .await
+        }),
+        task::spawn(async move {
+            restart_proc(
+                "wl-paste",
+                vec!["-t", "text", "--watch", "clipman", "store"],
+            )
+            .await
+        }),
+        task::spawn(async move {
+            start_proc(
+                "dbus-update-activation-environment",
+                vec![
+                    "SEATD_SOCK",
+                    "DISPLAY",
+                    "WAYLAND_DISPLAY",
+                    "XDG_SESSION_TYPE",
+                    "XDG_CURRENT_DESKTOP",
+                ],
+            )
+            .await
+        }),
+    ];
 
-    // Setting wallpaper (use 'ln -P' to an image here.)
-    restart_proc(
-        "swaybg",
-        vec![
-            "-m",
-            "fill",
-            "-i",
-            &format!("{}/{}", config_dir().unwrap().display(), "wallpaper"),
-        ],
-    );
-
-    // something I saw others did. I don't know why.
-    start_proc(
-        "dbus-update-activation-environment",
-        vec![
-            "SEATD_SOCK",
-            "DISPLAY",
-            "WAYLAND_DISPLAY",
-            "XDG_SESSION_TYPE",
-            "XDG_CURRENT_DESKTOP",
-        ],
-    );
-    restart_proc(
-        "mako",
-        vec![
-            "--default-timeout",
-            "5000",
-            "--background-color",
-            &colors.get(Colors::Surface, ColorFormat::RGBHex),
-            "--border-color",
-            &colors.get(Colors::Surface, ColorFormat::RGBHex),
-            "--border-size",
-            "0",
-            "--font",
-            "monospace",
-            "--padding",
-            "10",
-            "--width",
-            "350",
-        ],
-    );
-    restart_proc(
-        "rivertile",
-        vec!["-view-padding", "05", "-outer-padding", "05"],
-    );
-
-    create_empty_file("/home/a/.local/share/clipman-primary.json");
-    restart_proc(
-        "wl-paste",
-        vec!["-t", "text", "--watch", "clipman", "store"],
-    );
+    for handle in handles {
+        handle.await.unwrap();
+    }
 }
 
-fn create_empty_file(path: &str) {
-    if !fs::read(path).is_ok() {
-        match fs::write(path, " ") {
-            Ok(_) => (),
-            Err(e) => println!("=> => {}", e),
-        };
-    };
+async fn start_proc(process_name: &str, args: Vec<&str>) {
+    Command::new(process_name).args(&args).spawn().expect("");
 }
 
-fn start_proc(process_name: &str, args: Vec<&str>) {
-    Command::new(process_name)
-        .args(&args)
-        .spawn()
-        .expect(&format!(
-            "could not run process: {} {:#?}",
-            process_name, args
-        ));
-}
-fn restart_proc(process_name: &str, args: Vec<&str>) {
+async fn restart_proc(process_name: &str, args: Vec<&str>) {
     kill_procs(process_name);
     Command::new(process_name)
         .args(&args)
@@ -131,7 +127,6 @@ fn kill(pid: u32) {
     unsafe {
         _ = process::kill_process(process::Pid::from_raw(pid).unwrap(), process::Signal::Kill);
     }
-    println!("{}", pid)
 }
 fn is_proc_dir(file_name: &OsString) -> bool {
     match file_name.to_owned().into_string() {
