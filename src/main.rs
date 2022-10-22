@@ -3,6 +3,7 @@
 //! River window manager requires an executible to be configured
 //! so I ended up writing it rust. previously I made a Go version.
 //!
+//! The old version (written in Go) available at [River-Dotfiles](https://github.com/amirography/River-Dotfiles)
 
 mod config;
 mod river;
